@@ -1,7 +1,7 @@
 // Flash-sale load test. Everyone hits the same event at the same time; at the end we ask tickets for the truth (/audit).
 //
-//   docker run --rm --network k3d-cdn -v "$PWD/k6:/k6" \
-//     -e TICKETS_URL=http://k3d-cdn-serverlb/tickets -e ORDERS_URL=http://k3d-cdn-serverlb/orders \
+//   docker run --rm --network k3d-cdn-pl03 -v "$PWD/k6:/k6" \
+//     -e TICKETS_URL=http://k3d-cdn-pl03-serverlb/tickets -e ORDERS_URL=http://k3d-cdn-pl03-serverlb/orders \
 //     -e VUS=200 -e DURATION=20s -e CAPACITY=100 grafana/k6 run /k6/flash-sale.js
 // (inside a container, localhost is the container itself: join the cluster network)
 //

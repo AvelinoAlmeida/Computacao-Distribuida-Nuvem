@@ -4,10 +4,10 @@ metadata:
   name: orders-config
 data:
   TICKETS_URL: http://tickets:3001
-  TICKETS_TIMEOUT_MS: "100"
+  TICKETS_TIMEOUT_MS: "2000"
   TICKETS_RETRIES: "2"
   TICKETS_BACKOFF_MS: "100"
-  NOTIFY_MODE: async
+  NOTIFY_MODE: sync
   NOTIFICATIONS_URL: http://notifications:3003
   NOTIFY_TIMEOUT_MS: "5000"
   PG_POOL_MAX: "10"
@@ -27,7 +27,7 @@ spec:
     spec:
       containers:
         - name: orders
-          image: cdn-orders:1.0
+          image: cdn-pl03-orders:1.0
           imagePullPolicy: IfNotPresent
           ports: [{ containerPort: 3002 }]
           envFrom:

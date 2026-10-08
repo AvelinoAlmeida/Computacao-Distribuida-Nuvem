@@ -10,7 +10,7 @@ metadata:
 data:
   STOCK_STRATEGY: db-atomic
   IDEMPOTENCY: "on"              # on | off
-  RESPONSE_DELAY_MS: "300"
+  RESPONSE_DELAY_MS: "0"
   PG_POOL_MAX: "10"
   LOG_LEVEL: info
 ---
@@ -28,7 +28,7 @@ spec:
     spec:
       containers:
         - name: tickets
-          image: cdn-tickets:1.0
+          image: cdn-pl03-tickets:1.0
           imagePullPolicy: IfNotPresent
           ports: [{ containerPort: 3001 }]
           envFrom:

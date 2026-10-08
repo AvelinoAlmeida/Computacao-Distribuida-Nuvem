@@ -23,7 +23,7 @@ spec:
     spec:
       containers:
         - name: notifications
-          image: cdn-notifications:1.0
+          image: cdn-pl03-notifications:1.0
           imagePullPolicy: IfNotPresent
           ports: [{ containerPort: 3003 }]
           envFrom:
