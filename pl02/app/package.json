@@ -1,0 +1,15 @@
+{
+  "name": "pl02-k8s-demo",
+  "version": "1.0.0",
+  "description": "Minimal Express app for MEI.CDN PL02 (Kubernetes with k3d)",
+  "main": "app.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node app.js",
+    "dev": "node --watch app.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "pg": "^8.23.0"
+  }
+}

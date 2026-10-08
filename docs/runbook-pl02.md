@@ -12,7 +12,7 @@ Todos os comandos correm no terminal Ubuntu, a partir de `~/cdn/pl02`.
 
 ```bash
 mkdir -p ~/cdn/pl02
-cp -r /mnt/c/Users/avlal/Downloads/MEI.CDN-2627-PL02-code/code/. ~/cdn/pl02/   # copia o conteúdo de code/ para a pasta de trabalho
+cp -r /mnt/c/Users/Avelino/Downloads/MEI.CDN-2627-PL02/code/. ~/cdn/pl02/   # copia o conteúdo de code/ para a pasta de trabalho
 ```
 
 Se a cópia trouxer a pasta do zip e lixo do macOS:
@@ -293,6 +293,31 @@ docker rmi cdn-app:1.0 cdn-app:1.1      # apaga as imagens da app
 
 ---
 
+## Resultados obtidos (8 de outubro de 2026)
+
+Corrida completa com kubectl 1.37 e k3d 5.9.0 (k3s 1.35.5). O código da ficha está em `pl02/` neste repositório.
+
+| Secção | Medição | Resultado |
+|---|---|---|
+| 1 | `kubectl get nodes` | 3 nós `Ready`; 4 contentores, `serverlb` com `8080->80` |
+| 2.1 | apagar 1 de 5 Pods `hello` | ReplicaSet recria-o: continuam 5 |
+| 3 | Pods da app | 1 por nó (server-0, agent-0, agent-1); 3 IPs no EndpointSlice |
+| 3 | 6 pedidos via `kubectl exec` ao Service | alternam pelos 3 Pods |
+| 3 | 3 pedidos via port-forward | sempre o mesmo Pod |
+| 4 | 30 pedidos pelo Ingress | 11 / 10 / 9 por Pod |
+| 5 | `/db` antes / depois do Secret | `DATABASE_URL is not set` / `{"status":"ok",...}` |
+| 5 | Pod do Postgres | no `server-0` (nodeSelector); PVC `Pending` → `Bound` |
+| 5 | `SELECT * FROM notas` após apagar o Pod | `sobrevive ao Pod` |
+| 6 | Rolling update 1.0 → 1.1 com tráfego | 64 pedidos: 35 × `1.0 200`, 29 × `1.1 200`, nenhum erro |
+| 6 | Rollback | revisões 1, 3, 4; imagem `cdn-app:1.0` |
+| 6 | `cdn-app:9.9` | 1 Pod em `ImagePullBackOff`, 3 antigos `Running`, app sempre a responder |
+| 7.2 | `drain` + `uncordon` + `rollout restart` com tráfego | 150 pedidos, todos `200` |
+| 7.3 | `docker stop` de `agent-1` | `NotReady` ao fim de ~50 s; Pod substituto criado ~20 s depois (30 s de tolerância contados desde a perda de contacto) |
+| 7.3 | Pedidos durante a falha (~1 m 45 s) | 141 pedidos: 124 × `200`, 17 × `000` (~12 %) |
+| 7.4 | `docker start` | 3 nós `Ready` ao fim de 20 s; sem Pods em `Terminating` |
+
+---
+
 ## Problemas encontrados
 
 | Situação | Causa | Solução |
@@ -309,3 +334,5 @@ docker rmi cdn-app:1.0 cdn-app:1.1      # apaga as imagens da app
 | Terminal fora de `~/cdn/pl02` | Terminal aberto noutra pasta | `cd ~/cdn/pl02` antes de comandos com `k8s/` |
 | Aviso `last-applied-configuration` no `rollout undo` | O `undo` muda o cluster mas não o ficheiro | Repor o ficheiro com `cp k8s/solucao/...` |
 | `000` em cerca de 1 em cada 3 pedidos durante o `docker stop` | O `serverlb` do k3d continua a enviar ligações para o nó parado | Desaparece ao repor o nó; em produção, health checks no load balancer |
+| Cluster `cdn` já existente (sobra da PL03) a ocupar a 8080 | A PL03 não foi limpa até ao fim | `k3d cluster delete cdn` antes da secção 1 |
+| Pods antigos ~30-40 s em `Terminating` depois de um rollout | A app não trata `SIGTERM`; o Kubernetes espera o `terminationGracePeriodSeconds` (30 s) e só então a mata | Esperar; não afeta os pedidos (o Pod já saiu do Service) |
