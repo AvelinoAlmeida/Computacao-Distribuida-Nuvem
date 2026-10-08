@@ -12,7 +12,7 @@ spec:
     spec:
       containers:
         - name: app
-          image: cdn-app:1.0
+          image: cdn-pl02-app:1.0
           ports: [{ containerPort: 3000 }]
           env:
             - name: APP_VERSION

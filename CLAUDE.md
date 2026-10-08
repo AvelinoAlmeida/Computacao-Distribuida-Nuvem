@@ -8,8 +8,9 @@ Student coursework for CDN (Computação Distribuída e em Nuvem), MEI · ESTG P
 
 - Code and code READMEs from the course are in English. Runbooks, commit messages and the root README are in European Portuguese (pt-PT); keep that.
 - Runbooks follow a fixed shape: environment line, numbered sections with copy-pasteable bash blocks, "Resultados obtidos" tables with measured values, a "Problemas encontrados" table (Sintoma | Causa | Solução), and for PL03 a mapping to the theory class (T04).
-- Target environment: Windows 11 + WSL2 Ubuntu + Docker Desktop + kubectl + k3d. Commands in runbooks run in the Ubuntu terminal from `~/cdn/plNN` (the course handouts say `~/plNN`). The exception is PL01: it was run from this checkout (`/mnt/c/.../Computacao-Distribuida-Nuvem/pl01`).
-- Runbooks are being renamed to `docs/PLNN-<Tema>.md`, with a folder tree at the top and a "Resumo da execução" table at the end. `docs/PL01-Docker.md` is the first; PL02 and PL03 still use the old `runbook-plNN.md` names.
+- Target environment: Windows 11 + WSL2 Ubuntu + Docker Desktop + kubectl + k3d. Commands in runbooks run in the Ubuntu terminal from `~/cdn/plNN` (the course handouts say `~/plNN`). The exceptions are PL01 and PL02: they were run from this checkout (`/mnt/c/.../Computacao-Distribuida-Nuvem/plNN`).
+- Runbooks are being renamed to `docs/PLNN-<Tema>.md`, with a folder tree at the top and a "Resumo da execução" table at the end. Done so far: `docs/PL01-Docker.md` and `docs/PL02-Kubernetes.md`. PL03 still uses the old name `runbook-pl03.md`.
+- Docker resources carry a `cdn-plNN` prefix so they can be told apart from other projects on the same Docker Desktop. PL01 uses the image `cdn-pl01-app` (Compose resources already use `pl01-*`). PL02 uses the k3d cluster `cdn-pl02` (containers `k3d-cdn-pl02-*`, context `k3d-cdn-pl02`) and the image `cdn-pl02-app`, which the PL02 manifests reference.
 - To run WSL commands from the Git Bash tool, prefix with `MSYS_NO_PATHCONV=1`. Without it, `/mnt/c/...` paths get rewritten to Windows paths.
 
 ## pl01 — Docker
@@ -24,11 +25,11 @@ docker compose -f compose.healthcheck.yaml up -d --build
 
 ## pl02 — Kubernetes on k3d
 
-The PL01 app with one change: `GET /` also returns `version` from `APP_VERSION`. `k8s/` has one manifest per object (app Deployment/Service, Ingress, Postgres ConfigMap/Secret/PVC/Deployment/Service). The student edits `k8s/app-deployment.yaml` in sections 5 and 6. `k8s/solucao/app-deployment-s5.yaml` and `-s6.yaml` show how it should look after each section (compare with `diff`); s6 bumps the image to `cdn-app:1.1` for the rolling update.
+The PL01 app with one change: `GET /` also returns `version` from `APP_VERSION`. `k8s/` has one manifest per object (app Deployment/Service, Ingress, Postgres ConfigMap/Secret/PVC/Deployment/Service). The student edits `k8s/app-deployment.yaml` in sections 5 and 6. `k8s/solucao/app-deployment-s5.yaml` and `-s6.yaml` show how it should look after each section (compare with `diff`); s6 bumps the image to `cdn-pl02-app:1.1` for the rolling update. When the lab is run inside this checkout, restore the edited manifest afterwards with `git checkout -- k8s/app-deployment.yaml`.
 
 ```bash
-k3d cluster create cdn --servers 1 --agents 2 -p "8080:80@loadbalancer" --registry-config registries.yaml
-docker build -t cdn-app:1.0 app && k3d image import cdn-app:1.0 -c cdn
+k3d cluster create cdn-pl02 --servers 1 --agents 2 -p "8080:80@loadbalancer" --registry-config registries.yaml
+docker build -t cdn-pl02-app:1.0 app && k3d image import cdn-pl02-app:1.0 -c cdn-pl02
 kubectl apply -f k8s/app-deployment.yaml -f k8s/app-service.yaml -f k8s/ingress.yaml
 kubectl apply -f k8s/db-config.yaml -f k8s/db-secret.yaml -f k8s/db-pvc.yaml -f k8s/db-deployment.yaml -f k8s/db-service.yaml
 ```

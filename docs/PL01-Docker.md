@@ -55,9 +55,9 @@ Os ficheiros vêm do checkout Windows com fins de linha CRLF (`file Dockerfile c
 ## 1. Imagem e contentor
 
 ```bash
-docker build -t cdn-app:1.0 .           # constrói a imagem a partir do Dockerfile (~6 s, com a base em cache)
-docker images cdn-app                   # 62.9 MB de conteúdo (251 MB em disco)
-docker run -d --name app -p 3000:3000 cdn-app:1.0   # liga a porta 3000 do portátil à 3000 do contentor
+docker build -t cdn-pl01-app:1.0 .           # constrói a imagem a partir do Dockerfile (~6 s, com a base em cache)
+docker images cdn-pl01-app                   # 62.9 MB de conteúdo (251 MB em disco)
+docker run -d --name app -p 3000:3000 cdn-pl01-app:1.0   # liga a porta 3000 do portátil à 3000 do contentor
 curl -s localhost:3000/; echo           # "Hello from PL01!"; hostname = id curto do contentor
 curl -s localhost:3000/health; echo     # {"status":"ok",...}
 curl -s localhost:3000/db; echo         # erro 500: DATABASE_URL is not set (não há base de dados)
@@ -123,10 +123,10 @@ docker compose -f compose.healthcheck.yaml exec -T db psql -U app -d app -c "SEL
 
 ```bash
 docker compose -f compose.healthcheck.yaml down -v     # -v também apaga o volume pl01_dbdata
-docker rmi cdn-app:1.0 pl01-app                        # a imagem do passo 1 e a que o Compose construiu
+docker rmi cdn-pl01-app:1.0 pl01-app                        # a imagem do passo 1 e a que o Compose construiu
 docker ps -a | grep pl01                               # vazio
 docker volume ls | grep pl01                           # vazio
-docker images | grep -E "cdn-app|pl01"                 # vazio
+docker images | grep -E "cdn-pl01-app|pl01"                 # vazio
 ```
 
 ---
@@ -136,7 +136,7 @@ docker images | grep -E "cdn-app|pl01"                 # vazio
 | Secção | Medição | Resultado |
 |---|---|---|
 | 0 | Versões | Docker 29.8.2 (Client e Server), Compose v5.5.1; porta 3000 livre |
-| 1 | Build | ~6 s; `cdn-app:1.0` com 62.9 MB de conteúdo (251 MB em disco) |
+| 1 | Build | ~6 s; `cdn-pl01-app:1.0` com 62.9 MB de conteúdo (251 MB em disco) |
 | 1 | `/` e `/health` | `200`; `hostname` = id do contentor (`58441f3e60b6`), o mesmo que dá `docker exec app hostname` |
 | 1 | `/db` sem Compose | `500`, `DATABASE_URL is not set` |
 | 2 | `/db` de 0,5 em 0,5 s logo depois do `up` | 1 × `000` (0,0 s), 2 × `500 ECONNREFUSED 172.18.0.2:5432` (0,5 e 1,1 s), depois `200` a partir de 1,6 s |
