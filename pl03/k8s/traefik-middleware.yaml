@@ -1,0 +1,10 @@
+# Traefik (bundled with k3s) removes the /tickets or /orders prefix before
+# forwarding, so the services keep serving /events, /reservations, /orders...
+# exactly as they do on their own port.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: strip-prefix
+spec:
+  stripPrefix:
+    prefixes: [/tickets, /orders]

@@ -1,0 +1,69 @@
+# tickets. To change a value: edit the ConfigMap, kubectl apply -f k8s/tickets.yaml,
+# then kubectl rollout restart deployment/tickets (Pods read their environment
+# at start-up).
+# preStop: the old Pod keeps serving for 5 s after it leaves the Service, so the
+# Ingress stops sending it requests before it exits.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tickets-config
+data:
+  STOCK_STRATEGY: db-atomic
+  IDEMPOTENCY: "on"              # on | off
+  RESPONSE_DELAY_MS: "300"
+  PG_POOL_MAX: "10"
+  LOG_LEVEL: info
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tickets
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: tickets }
+  template:
+    metadata:
+      labels: { app: tickets }
+    spec:
+      containers:
+        - name: tickets
+          image: cdn-tickets:1.0
+          imagePullPolicy: IfNotPresent
+          ports: [{ containerPort: 3001 }]
+          envFrom:
+            - configMapRef: { name: tickets-config }
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef: { name: postgres, key: TICKETS_DATABASE_URL }
+          lifecycle:
+            preStop:
+              exec: { command: ["sleep", "5"] }
+          readinessProbe:
+            httpGet: { path: /ready, port: 3001 }
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /health, port: 3001 }
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests: { cpu: 100m, memory: 96Mi }
+            limits: { cpu: 500m, memory: 256Mi }
+      tolerations:
+        - key: node.kubernetes.io/not-ready
+          operator: Exists
+          effect: NoExecute
+          tolerationSeconds: 30
+        - key: node.kubernetes.io/unreachable
+          operator: Exists
+          effect: NoExecute
+          tolerationSeconds: 30
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tickets
+spec:
+  selector: { app: tickets }
+  ports: [{ port: 3001, targetPort: 3001 }]
