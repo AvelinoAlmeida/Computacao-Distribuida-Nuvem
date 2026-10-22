@@ -5,3 +5,5 @@ npm-debug.log
 Dockerfile
 .dockerignore
 compose.yaml
+compose*.yaml
+README.md
