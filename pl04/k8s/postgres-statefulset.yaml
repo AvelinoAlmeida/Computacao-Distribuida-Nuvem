@@ -1,0 +1,86 @@
+# PL04 Secção 1: Postgres como StatefulSet com Service headless.
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+spec:
+  clusterIP: None                        # ◄ headless: sem IP virtual, DNS por Pod
+  selector: { app: postgres }
+  ports: [{ port: 5432, targetPort: 5432 }]
+---
+apiVersion: apps/v1
+kind: StatefulSet                        # ◄ era Deployment
+metadata:
+  name: postgres
+spec:
+  serviceName: postgres                  # ◄ liga ao Service headless
+  replicas: 1
+  selector:
+    matchLabels: { app: postgres }
+  template:
+    metadata:
+      labels: { app: postgres }
+    spec:
+      affinity:                          # ◄ qualquer nó exceto o plano de controlo
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: node-role.kubernetes.io/control-plane
+                    operator: DoesNotExist
+      tolerations:                       # ◄ iguais às do tickets.yaml
+        - key: node.kubernetes.io/not-ready
+          operator: Exists
+          effect: NoExecute
+          tolerationSeconds: 30
+        - key: node.kubernetes.io/unreachable
+          operator: Exists
+          effect: NoExecute
+          tolerationSeconds: 30
+      containers:
+        - name: postgres
+          image: postgres:17-alpine
+          ports: [{ containerPort: 5432 }]
+          env:
+            - { name: POSTGRES_USER, value: app }
+            - { name: POSTGRES_DB, value: postgres }
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: postgres, key: POSTGRES_PASSWORD }
+            - name: REPLICATION_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: postgres, key: REPLICATION_PASSWORD }
+          readinessProbe:
+            exec:
+              command:
+                ["pg_isready", "-h", "127.0.0.1", "-U", "app", "-d", "postgres"]
+            periodSeconds: 5
+            timeoutSeconds: 3
+          livenessProbe:
+            exec:
+              command:
+                ["pg_isready", "-h", "127.0.0.1", "-U", "app", "-d", "postgres"]
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 6
+          volumeMounts:
+            - { name: data, mountPath: /var/lib/postgresql/data }
+            - { name: init, mountPath: /docker-entrypoint-initdb.d }
+          resources:
+            requests: { cpu: 100m, memory: 128Mi }
+            limits: { memory: 512Mi }
+      volumes:                           # ◄ só fica o init
+        - name: init
+          configMap:
+            name: postgres-init
+  volumeClaimTemplates:                  # ◄ substitui o PVC postgres-data
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ReadWriteOnce]
+        storageClassName: local-path
+        resources:
+          requests:
+            storage: 1Gi
+
