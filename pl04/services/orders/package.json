@@ -1,0 +1,17 @@
+{
+  "name": "cdn-orders",
+  "version": "1.1.0",
+  "description": "orders service: creates orders, calls tickets, notifies (sync HTTP or async RabbitMQ)",
+  "main": "src/index.js",
+  "private": true,
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "amqplib": "^0.10.8",
+    "express": "^5.1.0",
+    "pg": "^8.16.0",
+    "prom-client": "^15.1.3"
+  }
+}

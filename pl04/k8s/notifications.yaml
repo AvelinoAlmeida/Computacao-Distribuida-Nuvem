@@ -1,0 +1,71 @@
+# notifications: one replica on purpose (a single consumer makes the queue
+# behaviour easy to observe).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: notifications-config
+data:
+  CONSUMER: "on"                 # on | off
+  PREFETCH: "10"
+  NOTIFY_DELAY_MS: "500"        # simulated slow e-mail provider
+  PG_POOL_MAX: "10"
+  LOG_LEVEL: info
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notifications
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: notifications }
+  template:
+    metadata:
+      labels: { app: notifications }
+    spec:
+      containers:
+        - name: notifications
+          image: cdn-notifications:1.1
+          imagePullPolicy: IfNotPresent
+          ports: [{ containerPort: 3003 }]
+          envFrom:
+            - configMapRef: { name: notifications-config }
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef: { name: postgres, key: NOTIFICATIONS_DATABASE_URL }
+            - name: RABBITMQ_URL
+              valueFrom:
+                secretKeyRef: { name: rabbitmq, key: RABBITMQ_URL }
+          lifecycle:
+            preStop:
+              exec: { command: ["sleep", "5"] }
+          readinessProbe:
+            httpGet: { path: /ready, port: 3003 }
+            periodSeconds: 5
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet: { path: /health, port: 3003 }
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+          resources:
+            requests: { cpu: 100m, memory: 96Mi }
+            limits: { cpu: 500m, memory: 256Mi }
+      tolerations:
+        - key: node.kubernetes.io/not-ready
+          operator: Exists
+          effect: NoExecute
+          tolerationSeconds: 30
+        - key: node.kubernetes.io/unreachable
+          operator: Exists
+          effect: NoExecute
+          tolerationSeconds: 30
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: notifications
+spec:
+  selector: { app: notifications }
+  ports: [{ port: 3003, targetPort: 3003 }]

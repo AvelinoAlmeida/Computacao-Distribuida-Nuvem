@@ -1,0 +1,112 @@
+# Read replica of postgres-0 (streaming replication, asynchronous).
+# The init container copies the primary with pg_basebackup (only when its
+# volume is empty); the main container then starts Postgres as a standby that
+# keeps following the primary. Reads: Service postgres-replica.
+# The data lives in the pgdata subdirectory of the volume, owned by the postgres
+# user (uid 70) that runs both containers.
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-replica
+spec:
+  clusterIP: None
+  selector: { app: postgres-replica }
+  ports: [{ port: 5432, targetPort: 5432 }]
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres-replica
+spec:
+  serviceName: postgres-replica
+  replicas: 1
+  selector:
+    matchLabels: { app: postgres-replica }
+  template:
+    metadata:
+      labels: { app: postgres-replica }
+      annotations:
+        kubectl.kubernetes.io/default-container: postgres
+    spec:
+      securityContext:
+        runAsUser: 70
+        runAsGroup: 70
+        fsGroup: 70
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: node-role.kubernetes.io/control-plane
+                    operator: DoesNotExist
+        # Prefer another node than the primary's.
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels: { app: postgres }
+      initContainers:
+        - name: basebackup
+          image: postgres:17-alpine
+          env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef: { name: postgres, key: REPLICATION_PASSWORD }
+          command:
+            - sh
+            - -c
+            - |
+              if [ -f /var/lib/postgresql/data/pgdata/PG_VERSION ]; then
+                echo "data directory already initialised: nothing to copy"
+                exit 0
+              fi
+              until pg_isready -h postgres-0.postgres -U app; do sleep 2; done
+              pg_basebackup -h postgres-0.postgres -U replicator \
+                -D /var/lib/postgresql/data/pgdata -X stream -R -P
+          volumeMounts:
+            - { name: data, mountPath: /var/lib/postgresql/data }
+      containers:
+        - name: postgres
+          image: postgres:17-alpine
+          ports: [{ containerPort: 5432 }]
+          env:
+            - { name: PGDATA, value: /var/lib/postgresql/data/pgdata }
+          readinessProbe:
+            exec:
+              command:
+                ["pg_isready", "-h", "127.0.0.1", "-U", "app", "-d", "postgres"]
+            periodSeconds: 5
+            timeoutSeconds: 3
+          livenessProbe:
+            exec:
+              command:
+                ["pg_isready", "-h", "127.0.0.1", "-U", "app", "-d", "postgres"]
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 6
+          volumeMounts:
+            - { name: data, mountPath: /var/lib/postgresql/data }
+          resources:
+            requests: { cpu: 100m, memory: 128Mi }
+            limits: { memory: 512Mi }
+      tolerations:
+        - key: node.kubernetes.io/not-ready
+          operator: Exists
+          effect: NoExecute
+          tolerationSeconds: 30
+        - key: node.kubernetes.io/unreachable
+          operator: Exists
+          effect: NoExecute
+          tolerationSeconds: 30
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ReadWriteOnce]
+        storageClassName: local-path
+        resources:
+          requests:
+            storage: 1Gi

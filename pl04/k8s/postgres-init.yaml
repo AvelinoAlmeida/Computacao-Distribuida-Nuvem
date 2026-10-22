@@ -1,0 +1,20 @@
+# Start-up scripts for the Postgres data directory. They run once, only when the
+# data directory is empty (first start of a new volume):
+#  - init.sql: one server, three databases (tickets, orders, notifications).
+#  - replication.sh: the account used by a replica to copy and follow this
+#    server, and the line in pg_hba.conf that lets it connect.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init
+data:
+  init.sql: |
+    CREATE DATABASE tickets;
+    CREATE DATABASE orders;
+    CREATE DATABASE notifications;
+  replication.sh: |
+    psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d postgres <<SQL
+    CREATE ROLE replicator WITH REPLICATION LOGIN PASSWORD '$REPLICATION_PASSWORD';
+    ALTER SYSTEM SET wal_keep_size = '256MB';
+    SQL
+    echo "host replication replicator all scram-sha-256" >> "$PGDATA/pg_hba.conf"
